@@ -15,7 +15,7 @@ flag=false
 
 trap close SIGTERM SIGINT
 notify-send -a "Focusd" -u normal -t 3000 "Study Mode On" "Toggle the button to turn it off, break in 90 minutes"
-APPS=("gedit" "gnome-calculator" "Discord")
+APPS=("$@")
 while true; do
 	current_time=$(date +%s)
 	elapsed_time=$((current_time - start_time))
@@ -34,9 +34,7 @@ while true; do
 		flag=false
 	fi
 	for process in "${APPS[@]}"; do
-		pid="$(pgrep -f "$process")"
-		if [ -n "$pid" ]; then
-			kill $pid 2>/dev/null
+		if pkill -f "$process"; then
 			notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Study Mode On" "Blocked $process to prevent distraction"
 		fi
 	done
