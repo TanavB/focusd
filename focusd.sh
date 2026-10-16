@@ -1,5 +1,14 @@
+#!/usr/bin/env bash
 config_dir="$HOME/.config/focusd"
 config_file="$config_dir/blocked.conf"
+pid_loc="/tmp/focusd-$UID.txt"
+
+if [[ -f "$pid_loc" ]]; then
+        if kill -0 "$(<"$pid_loc")" 2>/dev/null && [[ "$1" != "--config" ]]; then
+		notify-send -a "Focusd" -t 3000 "Study Mode On" "Study Mode is already running"
+                exit 0
+        fi
+fi
 
 mkdir -p "$config_dir"
 
@@ -79,5 +88,15 @@ if [[ "$show" == true ]]; then
 else
 	restricted_apps=(${saved_apps[@]})
 fi
+
+if [[ -f "$pid_loc" ]]; then
+        if kill -0 "$(<"$pid_loc")" 2>/dev/null; then
+                kill -SIGHUP "$(<"$pid_loc")"
+                exit 0
+        else
+                rm -f "$pid_loc"
+        fi
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$SCRIPT_DIR/run.sh" "${restricted_apps[@]}" > /dev/null 2>&1 &

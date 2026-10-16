@@ -1,9 +1,15 @@
 temp="/tmp/focusd-$UID.txt"
-echo $$ > $temp
+echo $$ > "$temp"
 close() {
 	[ -n "$child_pid" ] && kill "$child_pid" 2>/dev/null
 	rm "$temp"
 	exit 0
+}
+
+config_file="$HOME/.config/focusd/blocked.conf"
+rewrite(){
+	readarray -t APPS < "$config_file"
+	notify-send -a "Focusd" -u low -t 2000 "Study Mode On" "Distracting Apps Updated"
 }
 
 work_time=5400
@@ -14,6 +20,7 @@ start_time=$(date +%s)
 flag=false
 
 trap close SIGTERM SIGINT
+trap rewrite SIGHUP
 notify-send -a "Focusd" -u normal -t 3000 "Study Mode On" "Toggle the button to turn it off, break in 90 minutes"
 APPS=("$@")
 while true; do
