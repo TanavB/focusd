@@ -1,8 +1,8 @@
-temp="/tmp/temp.txt"
+temp="/tmp/focusd-$UID.txt"
 echo $$ > $temp
 close() {
 	[ -n "$child_pid" ] && kill "$child_pid" 2>/dev/null
-	rm $temp
+	rm "$temp"
 	exit 0
 }
 
@@ -34,7 +34,7 @@ while true; do
 		flag=false
 	fi
 	for process in "${APPS[@]}"; do
-		if pkill -f "$process"; then
+		if pkill -x "$process"; then
 			notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Study Mode On" "Blocked $process to prevent distraction"
 		fi
 	done

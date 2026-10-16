@@ -1,4 +1,4 @@
-file="/tmp/temp.txt"
+file="/tmp/focusd-$UID.txt"
 if [[ ! -f "$file" ]]; then
 	notify-send -a "Focusd" -u normal "Study Mode Toggle" "Study mode is not running"
 else
