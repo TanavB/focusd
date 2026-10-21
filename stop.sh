@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 file="/tmp/focusd-$UID.txt"
 dnsmasq_file="/tmp/focusd-dns-$UID.txt"
 if [[ ! -f "$file" ]]; then

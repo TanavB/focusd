@@ -3,8 +3,8 @@ temp="/tmp/focusd-$UID.txt"
 echo $$ > "$temp"
 
 clear_firewall(){
-	sudo ip6tables -D OUTPUT -p tcp -m multiport --dports 80,53,443 -j REJECT
-	sudo ip6tables -D OUTPUT -p udp -m multiport --dports 80,53,443 -j REJECT
+	while sudo ip6tables -D OUTPUT -p tcp -m multiport --dports 80,53,443 -j REJECT; do :; done
+	while sudo ip6tables -D OUTPUT -p udp -m multiport --dports 80,53,443 -j REJECT; do :; done
 	
 	DOH_IPS=(
     		"8.8.8.8" "8.8.4.4"           # Google
@@ -19,17 +19,18 @@ clear_firewall(){
     		"77.88.8.8" "77.88.8.1"       # Yandex
 	)
 	for ip in "${DOH_IPS[@]}"; do
-    		sudo iptables -D OUTPUT -p tcp -d "$ip" -m multiport --dports 80,443 -j REJECT
-		sudo iptables -D OUTPUT -p udp -d "$ip" -m multiport --dports 80,443 -j REJECT
+    		while sudo iptables -D OUTPUT -p tcp -d "$ip" -m multiport --dports 80,443 -j REJECT; do :; done
+		while sudo iptables -D OUTPUT -p udp -d "$ip" -m multiport --dports 80,443 -j REJECT; do :; done
 	done
 
-	sudo iptables -D OUTPUT -t nat -p tcp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5353
-	sudo iptables -D OUTPUT -t nat -p udp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5353
+	while sudo iptables -D OUTPUT -t nat -p tcp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5354; do :; done
+	while sudo iptables -D OUTPUT -t nat -p udp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5354; do :; done
 }
 
 apply_firewall(){
         clear_firewall
-
+	
+	sudo sysctl -w net.ipv4.conf.all.route_localnet=1 >/dev/null 2>&1
 	sudo ip6tables -I OUTPUT 1 -p tcp -m multiport --dports 80,53,443 -j REJECT
 	sudo ip6tables -I OUTPUT 1 -p udp -m multiport --dports 80,53,443 -j REJECT
 	
@@ -50,8 +51,8 @@ apply_firewall(){
 		sudo iptables -A OUTPUT -p udp -d "$ip" -m multiport --dports 80,443 -j REJECT
 	done
 	
-	sudo iptables -I OUTPUT 1 -t nat -p tcp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5353
-	sudo iptables -I OUTPUT 1 -t nat -p udp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5353
+	sudo iptables -I OUTPUT 1 -t nat -p tcp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5354
+	sudo iptables -I OUTPUT 1 -t nat -p udp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5354
 	sudo resolvectl flush-caches 2>/dev/null
 }
 
@@ -122,7 +123,8 @@ rewrite(){
 	if [[ -f "/tmp/focusd-dns-$UID.txt" ]]; then
 		sudo kill "$(cat "/tmp/focusd-dns-$UID.txt")"
 	fi
-	sudo dnsmasq -C "$allow_config_file" -a 127.0.0.1 -p 5353 -x "/tmp/focusd-dns-$UID.txt"
+
+	sudo dnsmasq -C "$allow_config_file" -a 127.0.0.1 -p 5354 -x "/tmp/focusd-dns-$UID.txt"
 	apply_firewall
 
 	if [[ "$1" != "init" ]]; then
@@ -162,6 +164,7 @@ while true; do
 		flag=false
 	fi
 	for process in "${APPS[@]}"; do
+		if [[ -z "$process" ]]; then continue; fi
 		if { [[ ${#process} -le 15 ]] && pkill -x -i "$process"; } || { [[ ${#process} -gt 15 ]] && pkill -f -i "(^|/)$process($| )"; }; then
 			notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Study Mode On" "Blocked $process to prevent distraction"
 		fi
