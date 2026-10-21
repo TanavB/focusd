@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 config_dir="$HOME/.config/focusd"
 config_file="$config_dir/blocked.conf"
+website_file="$config_dir/allowed_sites.conf"
 pid_loc="/tmp/focusd-$UID.txt"
 
 if [[ -f "$pid_loc" ]]; then
@@ -13,15 +14,15 @@ fi
 mkdir -p "$config_dir"
 
 show=false
-if [[ "$1" == "--config" || ! -s "$config_file" ]]; then
+if [[ "$1" == "--config" || ! -s "$config_file" || ! -s "$website_file" ]]; then
 	show=true
 fi
 
 if [[ -f "$config_file" ]]; then
 	readarray -t saved_apps < "$config_file"
 fi
-if [[ "$show" == true ]]; then
 
+if [[ "$show" == true ]]; then
 	display_apps=()
 
 	for file in /usr/share/applications/*.desktop ~/.local/share/applications/*.desktop /var/lib/snapd/desktop/applications/*.desktop; do
@@ -52,7 +53,7 @@ if [[ "$show" == true ]]; then
     		esac
 
 		status=FALSE
-		for app in ${saved_apps[@]}; do
+		for app in "${saved_apps[@]}"; do
 			if [[ "$app" == "$app_name" ]]; then
 				status=TRUE
 				break
@@ -61,7 +62,6 @@ if [[ "$show" == true ]]; then
     		display_apps+=("$status" "$display_name" "$app_name")
 	done
 
-	restricted_apps=()
 	chosen=()
 
 	while true; do
@@ -69,6 +69,7 @@ if [[ "$show" == true ]]; then
 			--title="Select Distracting Apps" \
 			--column="select" --column="Applications" --column="Exec Name" \
 			--hide-column=3 --print-column=3 \
+			--ok-label="Next" \
 			--width=600 --height=550 \
 			"${display_apps[@]}" 2>/dev/null)
 		if [[ $? -ne 0 ]]; then
@@ -82,11 +83,28 @@ if [[ "$show" == true ]]; then
 		fi
 		
 		echo "$chosen" | tr '|' '\n' > "$config_file"
-		IFS="|" read -r -a restricted_apps < <(echo -n "$chosen")
 		break
 	done
-else
-	restricted_apps=(${saved_apps[@]})
+
+	while true; do
+		touch "$website_file"
+		tmp_edit="/tmp/focusd_web_$UID.txt"
+		cp "$website_file" "$tmp_edit"
+
+		zenity --text-info --editable \
+		--title="Allowed Websites" \
+		--width=500 --height=450 \
+		--filename "$website_file" > "$tmp_edit" 2>/dev/null
+
+		if [[ $? -ne 0 ]]; then
+			rm -f "$tmp_edit" 
+			exit 0
+		fi
+
+		cat "$tmp_edit" | sed -E 's/^(https?:\/\/)?([^/]+).*/\2/' | tr '[:upper:]' '[:lower:]' | grep -v '^[[:space:]]*$' | sort -u > "$website_file"
+		rm -f "$tmp_edit"
+		break
+	done
 fi
 
 if [[ -f "$pid_loc" ]]; then
@@ -99,4 +117,4 @@ if [[ -f "$pid_loc" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-"$SCRIPT_DIR/run.sh" "${restricted_apps[@]}" > /dev/null 2>&1 &
+"$SCRIPT_DIR/run.sh" "init" > /dev/null 2>&1 &
