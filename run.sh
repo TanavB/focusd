@@ -3,6 +3,8 @@ temp="/tmp/focusd-$UID.txt"
 echo $$ > "$temp"
 
 clear_firewall(){
+	
+	while sudo iptables -D OUTPUT -p udp --dport 443 -j REJECT 2>/dev/null; do :; done
 	while sudo ip6tables -D OUTPUT -p tcp -m multiport --dports 80,53,443 -j REJECT; do :; done
 	while sudo ip6tables -D OUTPUT -p udp -m multiport --dports 80,53,443 -j REJECT; do :; done
 	
@@ -25,12 +27,16 @@ clear_firewall(){
 
 	while sudo iptables -D OUTPUT -t nat -p tcp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5354; do :; done
 	while sudo iptables -D OUTPUT -t nat -p udp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5354; do :; done
+	sudo resolvectl flush-caches 2>/dev/null
+	sudo conntrack -F
+	sudo ss -K -t state established '( dport = :http or dport = :https or sport = :http or sport = :https )' 2>/dev/null
 }
 
 apply_firewall(){
         clear_firewall
 	
 	sudo sysctl -w net.ipv4.conf.all.route_localnet=1 >/dev/null 2>&1
+	sudo iptables -I OUTPUT 1 -p udp --dport 443 -j REJECT
 	sudo ip6tables -I OUTPUT 1 -p tcp -m multiport --dports 80,53,443 -j REJECT
 	sudo ip6tables -I OUTPUT 1 -p udp -m multiport --dports 80,53,443 -j REJECT
 	
@@ -54,6 +60,8 @@ apply_firewall(){
 	sudo iptables -I OUTPUT 1 -t nat -p tcp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5354
 	sudo iptables -I OUTPUT 1 -t nat -p udp --dport 53 -j DNAT -m owner --uid-owner $UID --to-destination 127.0.0.1:5354
 	sudo resolvectl flush-caches 2>/dev/null
+	sudo conntrack -F 2>/dev/null
+	sudo ss -K -t state established '( dport = :http or dport = :https or sport = :http or sport = :https )' 2>/dev/null
 }
 
 close() {
@@ -133,12 +141,13 @@ rewrite(){
 }
 
 
-work_time=5400
-break_time_before_notif=1080
-notif_time=5280
+work_time=180
+break_time_before_notif=60
+notif_time=60
 break_time_after_notif=120
 start_time=$(date +%s)
 flag=false
+pre_released=false
 
 trap close SIGTERM SIGINT
 trap rewrite SIGHUP
@@ -150,9 +159,11 @@ while true; do
 	if [[ "$flag" == false && $elapsed_time -ge $notif_time && $elapsed_time -lt $work_time ]]; then
 		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3500 "Break Time" "Break time starts in 2 minutes"
 		flag=true
+	elif [[ "$pre_released" == false && $elapsed_time -ge $((work_time - 60)) ]]; then
+		clear_firewall
+		pre_released=true
 	elif [[ $elapsed_time -ge $work_time ]]; then
 		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Break Time" "Restrictions removed for 20 minutes. Have a break!"
-		clear_firewall
 		sleep $break_time_before_notif & child_pid=$!
 		wait $child_pid
 		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3500 "Break Time" "Break time ends in 2 minutes"
@@ -162,6 +173,7 @@ while true; do
 		apply_firewall
 		start_time=$(date +%s)
 		flag=false
+		pre_released=false
 	fi
 	for process in "${APPS[@]}"; do
 		if [[ -z "$process" ]]; then continue; fi
