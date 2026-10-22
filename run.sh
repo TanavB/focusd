@@ -77,10 +77,29 @@ close() {
 	exit 0
 }
 
-config_file="$HOME/.config/focusd/blocked.conf"
-web_config_file="$HOME/.config/focusd/allowed_sites.conf"
-allow_config_file="$HOME/.config/focusd/dnsmasq_sites.conf"
+config_dir="$HOME/.config/focusd"
+config_file="$config_dir/blocked.conf"
+web_config_file="$config_dir/allowed_sites.conf"
+allow_config_file="$config_dir/dnsmasq_sites.conf"
+settings_file="$config_dir/settings.conf"
+load_settings() {
+	if [[ -f "$settings_file" ]]; then
+		source "$settings_file"
+	else
+		work_time=5400      # 90 mins
+		break_time=1200     # 20 mins
+	fi
+
+	# Break notification alert logic (warning 2 mins / 120s prior)
+	notif_time=$(( work_time - 120 ))
+
+	# Partition break sleep: stage 1 before warning, stage 2 (120s) after warning
+	break_time_before_notif=$(( break_time - 120 ))
+	break_time_after_notif=120
+}
+
 rewrite(){
+	load_settings
 	readarray -t APPS < "$config_file"
 	readarray -t WEBSITES < "$web_config_file"
 	echo "address=/#/0.0.0.0" > "$allow_config_file"
@@ -141,17 +160,14 @@ rewrite(){
 }
 
 
-work_time=180
-break_time_before_notif=60
-notif_time=60
-break_time_after_notif=120
+load_settings
 start_time=$(date +%s)
 flag=false
 pre_released=false
 
 trap close SIGTERM SIGINT
 trap rewrite SIGHUP
-notify-send -a "Focusd" -u normal -t 3000 "Study Mode On" "Toggle the button to turn it off, break in 90 minutes"
+notify-send -a "Focusd" -u normal -t 3000 "Study Mode On" "Toggle button to turn off. Next break in $(( work_time / 60 )) minutes."
 rewrite init
 while true; do
 	current_time=$(date +%s)
@@ -163,13 +179,13 @@ while true; do
 		clear_firewall
 		pre_released=true
 	elif [[ $elapsed_time -ge $work_time ]]; then
-		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Break Time" "Restrictions removed for 20 minutes. Have a break!"
+		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Break Time" "Restrictions removed for $(( break_time / 60 )) minutes. Have a break!"
 		sleep $break_time_before_notif & child_pid=$!
 		wait $child_pid
 		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3500 "Break Time" "Break time ends in 2 minutes"
 		sleep $break_time_after_notif & child_pid=$!
 		wait $child_pid
-		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Study Mode On" "Restrictions applied, next break in 90 minutes"
+		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Study Mode On" "Restrictions applied, next break in $(( work_time / 60 )) minutes"
 		apply_firewall
 		start_time=$(date +%s)
 		flag=false

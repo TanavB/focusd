@@ -2,6 +2,7 @@
 config_dir="$HOME/.config/focusd"
 config_file="$config_dir/blocked.conf"
 website_file="$config_dir/allowed_sites.conf"
+settings_file="$config_dir/settings.conf"
 pid_loc="/tmp/focusd-$UID.txt"
 
 if [[ -f "$pid_loc" ]]; then
@@ -14,7 +15,7 @@ fi
 mkdir -p "$config_dir"
 
 show=false
-if [[ "$1" == "--config" || ! -s "$config_file" || ! -s "$website_file" ]]; then
+if [[ "$1" == "--config" || ! -s "$config_file" || ! -s "$website_file" || ! -s "$settings_file" ]]; then
 	show=true
 fi
 
@@ -105,6 +106,45 @@ if [[ "$show" == true ]]; then
 		rm -f "$tmp_edit"
 		break
 	done
+
+	touch "$settings_file"
+	work_time=$(zenity --scale \
+			--text="Select working time in minutes" \
+			--min-value=30 \
+			--max-value=120 \
+			--value=90 \
+			--step=5 2>/dev/null)
+
+	if [[ $? -ne 0 ]]; then
+		if [[ ! -s "$settings_file" ]]; then
+			rm -f "$settings_file"
+		fi
+		exit 0
+	fi
+	work_time=$(( ((work_time + 2) / 5) * 5 ))
+	max_break=$(( work_time - 5 ))
+	default_break=20
+	if (( default_break > max_break )); then
+	    default_break=$max_break
+	fi
+	
+	break_time=$(zenity --scale \
+			--text="Select break time in minutes" \
+			--min-value=5 \
+			--max-value=$max_break \
+			--value=$default_break \
+			--step=5 2>/dev/null)
+	
+	if [[ $? -ne 0 ]]; then
+		if [[ ! -s "$settings_file" ]]; then
+			rm -f "$settings_file"
+		fi
+		exit 0
+	fi
+	break_time=$(( ((break_time + 2) / 5) * 5 ))
+
+	echo "work_time=$(( work_time * 60 ))" > "$settings_file"
+	echo "break_time=$(( break_time * 60 ))" >> "$settings_file"
 fi
 
 if [[ -f "$pid_loc" ]]; then
