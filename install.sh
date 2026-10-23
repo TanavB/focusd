@@ -38,7 +38,7 @@ DESKTOP_LOC="$HOME/.local/share/applications"
 REPO_URL="https://raw.githubusercontent.com/TanavB/focusd/main"
 mkdir -p "$APP_LOC" "$CONFIG_LOC" "$BIN_LOC" "$DESKTOP_LOC"
 
-scripts=("focusd.sh" "run.sh" "stop.sh" "toggle.sh" "stats.sh")
+scripts=("uninstall.sh" "focusd.sh" "run.sh" "stop.sh" "toggle.sh" "stats.sh")
 for script in "${scripts[@]}"; do
 	echo "Downloading $script..."
     	curl -sL "$REPO_URL/$script" -o "$APP_LOC/$script"
@@ -51,6 +51,7 @@ done
 
 chmod +x "$APP_LOC"/*.sh
 
+ln -sf "$APP_LOC/uninstall.sh" "$BIN_LOC/focusd-uninstall"
 ln -sf "$APP_LOC/toggle.sh" "$BIN_LOC/focusd-toggle"
 ln -sf "$APP_LOC/stats.sh" "$BIN_LOC/focusd-stats"
 
