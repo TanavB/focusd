@@ -95,5 +95,21 @@ EOF
 
 chmod +x "$DESKTOP_LOC"/*.desktop
 
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$DESKTOP_LOC" 2>/dev/null
+fi
+
+ensure_path() {
+    local rc_file="$1"
+    if [[ -f "$rc_file" ]] && ! grep -q 'PATH=.*\.local/bin' "$rc_file"; then
+        echo -e '\n# Added by Focusd\nexport PATH="$HOME/.local/bin:$PATH"' >> "$rc_file"
+    fi
+}
+
+ensure_path "$HOME/.bashrc"
+ensure_path "$HOME/.profile"
+ensure_path "$HOME/.zshrc" 2>/dev/null
+
 sudo -k
 echo -e "${GREEN}Installation successful! Focusd is ready to use.${RESET}"
+echo -e "Launch '${YELLOW}Focusd (Study Mode)${RESET}' from your app menu, or open a new terminal to use ${YELLOW}focusd-toggle${RESET}."
