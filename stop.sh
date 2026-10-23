@@ -19,7 +19,7 @@ else
 	fi
 	pid=$(cat "$file")
 	if kill -0 "$pid" 2>/dev/null; then
-		if [[ "$hardcore_mode" == true ]]; then	
+		if [[ "$hardcore_mode" == "true" ]]; then	
 			injected=false
 			if ! grep -q "codeforces.com" "$allow_config_file"; then
 				injected=true

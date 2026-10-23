@@ -154,7 +154,7 @@ if [[ "$show" == true ]]; then
 	work_time=$(( ((work_time + 2) / 5) * 5 ))
 	max_break=$(( work_time - 5 ))
 	last_break_min=$(( ${break_time:-1200} / 60 ))
-	if [[ $last_break_min -le $max_break && $last_break_min -ge 5]]; then
+	if [[ $last_break_min -le $max_break && $last_break_min -ge 5 ]]; then
 		default_break=$last_break_min
 	else
 		default_break=20
