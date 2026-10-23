@@ -106,13 +106,32 @@ if [[ "$show" == true ]]; then
 		rm -f "$tmp_edit"
 		break
 	done
+	
+	touch "$settings_file"
+	if [[ -s "$settings_file" ]]; then
+		source "$settings_file" 2>/dev/null
+	fi
+	default_work_min=$(( ${work_time:-5400} / 60 ))
+
+	cf_handle=$(zenity --entry \
+		--title="Codeforces Handle" \
+		--text="Enter your Codeforces handle for verification challenges:" \
+		--entry-text="${cf_handle:-}" \
+		--width=450 2>/dev/null)
+
+	if [[ $? -ne 0 ]]; then
+		if [[ ! -s "$settings_file" ]]; then
+			rm -f "$settings_file"
+		fi
+		exit 0
+	fi
 
 	touch "$settings_file"
 	work_time=$(zenity --scale \
 			--text="Select working time in minutes" \
 			--min-value=30 \
 			--max-value=120 \
-			--value=90 \
+			--value="$default_work_min" \
 			--step=5 2>/dev/null)
 
 	if [[ $? -ne 0 ]]; then
@@ -123,11 +142,12 @@ if [[ "$show" == true ]]; then
 	fi
 	work_time=$(( ((work_time + 2) / 5) * 5 ))
 	max_break=$(( work_time - 5 ))
-	default_break=20
-	if (( default_break > max_break )); then
-	    default_break=$max_break
-	fi
-	
+	last_break_min=$(( ${break_time:-1200} / 60 ))
+	if [[ $last_break_min -le $max_break && $last_break_min -ge 5]]; then
+		default_break=$last_break_min
+	else
+		default_break=20
+	fi	
 	break_time=$(zenity --scale \
 			--text="Select break time in minutes" \
 			--min-value=5 \
@@ -142,8 +162,9 @@ if [[ "$show" == true ]]; then
 		exit 0
 	fi
 	break_time=$(( ((break_time + 2) / 5) * 5 ))
-
-	echo "work_time=$(( work_time * 60 ))" > "$settings_file"
+	
+	echo "cf_handle=\"$cf_handle\"" > "$settings_file"
+	echo "work_time=$(( work_time * 60 ))" >> "$settings_file"
 	echo "break_time=$(( break_time * 60 ))" >> "$settings_file"
 fi
 

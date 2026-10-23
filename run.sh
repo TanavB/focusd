@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 temp="/tmp/focusd-$UID.txt"
-dns_raw_log="/tmp/focusd-dns-raw-$UID.log"
+dns_raw_log="$HOME/.config/focusd/dns-raw.log"
 echo $$ > "$temp"
 
 clear_firewall(){
@@ -74,7 +74,8 @@ close() {
 		kill "$child_pid" 2>/dev/null
 	fi
 	if [[ -n "$dns_tail_pid" ]]; then
-    		kill "$dns_tail_pid" 2>/dev/null
+    		pkill -P "$dns_tail_pid" 2>/dev/null
+		kill "$dns_tail_pid" 2>/dev/null
 	fi
 	rm -f "/tmp/focusd-dns-$UID.txt"
 	rm -f "$dns_raw_log"
@@ -122,6 +123,15 @@ rewrite(){
 		echo "server=/$website/8.8.8.8" >> "$allow_config_file"
 	done
 	CORE_INFRA=(
+		"google.com"
+		"gstatic.com"
+		"googleapis.com"
+		"googleusercontent.com"
+		"ggpht.com"
+		"googlevideo.com"
+		"1e100.net"
+		"ytimg.com"
+		"youtu.be"
 		"cloudflare.com"
 		"cdnjs.cloudflare.com"
 		"fastly.net"
@@ -132,10 +142,6 @@ rewrite(){
 		"unpkg.com"
 		"bootstrapcdn.com"
 		"code.jquery.com"
-		"gstatic.com"
-		"googleapis.com"
-		"googleusercontent.com"
-		"accounts.google.com"
 		"recaptcha.net"
 		"hcaptcha.com"
 		"githubassets.com"
@@ -151,6 +157,28 @@ rewrite(){
 		"visualstudio.com"
 		"vscode-unpkg.net"
 		"figma.net"
+		"amazonaws.com"
+		"azureedge.net"
+		"windows.net"
+		"live.com"
+		"microsoftonline.com"
+		"firebaseapp.com"
+		"web.app"
+		"gravatar.com"
+		"auth0.com"
+		"wp.com"
+		"scdn.co"
+		"spotifycdn.com"
+		"discordapp.net"
+		"discord.gg"
+		"slack-edge.com"
+		"zoom.us"
+		"medium.com"
+		"substackcdn.com"
+		"cdninstagram.com"
+		"twimg.com"
+		"mathjax.org"
+		"katex.org"
 	)
 	
 	for cdn in "${CORE_INFRA[@]}"; do
@@ -162,8 +190,9 @@ rewrite(){
 	if [[ -f "/tmp/focusd-dns-$UID.txt" ]]; then
 		sudo kill "$(cat "/tmp/focusd-dns-$UID.txt")"
 	fi
-
-	sudo dnsmasq -C "$allow_config_file" -a 127.0.0.1 -p 5354 -x "/tmp/focusd-dns-$UID.txt"
+	touch "$dns_raw_log"
+	chmod 666 "$dns_raw_log"
+	sudo dnsmasq -u nobody -C "$allow_config_file" -a 127.0.0.1 -p 5354 -R -x "/tmp/focusd-dns-$UID.txt"
 	apply_firewall
 
 	if [[ "$1" != "init" ]]; then
