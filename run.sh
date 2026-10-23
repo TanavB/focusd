@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 temp="/tmp/focusd-$UID.txt"
+dns_raw_log="/tmp/focusd-dns-raw-$UID.log"
 echo $$ > "$temp"
 
 clear_firewall(){
@@ -72,8 +73,12 @@ close() {
 	if [[ -n "$child_pid" ]]; then
 		kill "$child_pid" 2>/dev/null
 	fi
-	rm "/tmp/focusd-dns-$UID.txt"
-	rm "$temp"
+	if [[ -n "$dns_tail_pid" ]]; then
+    		kill "$dns_tail_pid" 2>/dev/null
+	fi
+	rm -f "/tmp/focusd-dns-$UID.txt"
+	rm -f "$dns_raw_log"
+	rm -f "$temp"
 	exit 0
 }
 
@@ -96,6 +101,12 @@ load_settings() {
 	# Partition break sleep: stage 1 before warning, stage 2 (120s) after warning
 	break_time_before_notif=$(( break_time - 120 ))
 	break_time_after_notif=120
+}
+log_file="$config_dir/session.log"
+log_event() {
+    local event_type="$1"
+    local payload="$2"
+    printf "%s|%s|%s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$event_type" "$payload" >> "$log_file"
 }
 
 rewrite(){
@@ -146,7 +157,8 @@ rewrite(){
 		echo "server=/$cdn/8.8.8.8" >> "$allow_config_file"
 	done
 	echo "local-ttl=0" >> "$allow_config_file"
-
+	echo "log-queries" >> "$allow_config_file"
+	echo "log-facility=$dns_raw_log" >> "$allow_config_file"
 	if [[ -f "/tmp/focusd-dns-$UID.txt" ]]; then
 		sudo kill "$(cat "/tmp/focusd-dns-$UID.txt")"
 	fi
@@ -156,6 +168,7 @@ rewrite(){
 
 	if [[ "$1" != "init" ]]; then
 		notify-send -a "Focusd" -u low -t 2000 "Study Mode On" "Distracting Apps Updated"
+		log_event "START" "WORK_TIME=$work_time"
 	fi
 }
 
@@ -169,6 +182,13 @@ trap close SIGTERM SIGINT
 trap rewrite SIGHUP
 notify-send -a "Focusd" -u normal -t 3000 "Study Mode On" "Toggle button to turn off. Next break in $(( work_time / 60 )) minutes."
 rewrite init
+touch "$dns_raw_log"
+tail -F -n0 "$dns_raw_log" 2>/dev/null | while read -r _ _ _ _ _ event domain _ ip; do
+    if [[ "$ip" == "0.0.0.0" && "$domain" != "use-application-dns.net" ]]; then
+        printf "%(%Y-%m-%d %H:%M:%S)T|BLOCKED_WEBSITE|%s\n" -1 "$domain" >> "$log_file"
+    fi
+done &
+dns_tail_pid=$!
 while true; do
 	current_time=$(date +%s)
 	elapsed_time=$((current_time - start_time))
@@ -180,6 +200,7 @@ while true; do
 		pre_released=true
 	elif [[ $elapsed_time -ge $work_time ]]; then
 		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Break Time" "Restrictions removed for $(( break_time / 60 )) minutes. Have a break!"
+		log_event "BREAK_START" "BREAK_TIME=$break_time"
 		sleep $break_time_before_notif & child_pid=$!
 		wait $child_pid
 		notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3500 "Break Time" "Break time ends in 2 minutes"
@@ -195,6 +216,7 @@ while true; do
 		if [[ -z "$process" ]]; then continue; fi
 		if { [[ ${#process} -le 15 ]] && pkill -x -i "$process"; } || { [[ ${#process} -gt 15 ]] && pkill -f -i "(^|/)$process($| )"; }; then
 			notify-send -h boolean:transient:true -a "Focusd" -u normal -t 3000 "Study Mode On" "Blocked $process to prevent distraction"
+			log_event "BLOCKED_APP" "$process"
 		fi
 	done
 
