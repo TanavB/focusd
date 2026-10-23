@@ -113,17 +113,28 @@ if [[ "$show" == true ]]; then
 	fi
 	default_work_min=$(( ${work_time:-5400} / 60 ))
 
-	cf_handle=$(zenity --entry \
-		--title="Codeforces Handle" \
-		--text="Enter your Codeforces handle for verification challenges:" \
-		--entry-text="${cf_handle:-}" \
-		--width=450 2>/dev/null)
+	zenity --question \
+		--title="Hardcore Mode" \
+		--text="Enable Hardcore Mode?\n(Requires solving a Codeforces problem to exit Study Mode early)" \
+		--width=450 2>/dev/null
 
-	if [[ $? -ne 0 ]]; then
-		if [[ ! -s "$settings_file" ]]; then
-			rm -f "$settings_file"
+	if [[ $? -eq 0 ]]; then
+		hardcore_mode="true"
+		cf_handle=$(zenity --entry \
+			--title="Codeforces Handle" \
+			--text="Enter your Codeforces handle for verification challenges:" \
+			--entry-text="${cf_handle:-}" \
+			--width=450 2>/dev/null)
+
+		if [[ $? -ne 0 ]]; then
+			if [[ ! -s "$settings_file" ]]; then
+				rm -f "$settings_file"
+			fi
+			exit 0
 		fi
-		exit 0
+	else
+		hardcore_mode="false"
+		cf_handle="${cf_handle:-}" # Keep previous handle in config just in case
 	fi
 
 	touch "$settings_file"
@@ -163,7 +174,8 @@ if [[ "$show" == true ]]; then
 	fi
 	break_time=$(( ((break_time + 2) / 5) * 5 ))
 	
-	echo "cf_handle=\"$cf_handle\"" > "$settings_file"
+	echo "hardcore_mode=\"$hardcore_mode\"" > "$settings_file"
+	echo "cf_handle=\"$cf_handle\"" >> "$settings_file"
 	echo "work_time=$(( work_time * 60 ))" >> "$settings_file"
 	echo "break_time=$(( break_time * 60 ))" >> "$settings_file"
 fi
