@@ -212,9 +212,12 @@ trap rewrite SIGHUP
 notify-send -a "Focusd" -u normal -t 3000 "Study Mode On" "Toggle button to turn off. Next break in $(( work_time / 60 )) minutes."
 rewrite init
 touch "$dns_raw_log"
-tail -F -n0 "$dns_raw_log" 2>/dev/null | while read -r _ _ _ _ _ event domain _ ip; do
-    if [[ "$ip" == "0.0.0.0" && "$domain" != "use-application-dns.net" ]]; then
-        printf "%(%Y-%m-%d %H:%M:%S)T|BLOCKED_WEBSITE|%s\n" -1 "$domain" >> "$log_file"
+tail -F -n0 "$dns_raw_log" 2>/dev/null | while read -r line; do
+    if [[ "$line" =~ (reply|config)[[:space:]]+([^[:space:]]+)[[:space:]]+is[[:space:]]+0\.0\.0\.0 ]]; then
+        domain="${BASH_REMATCH[2]}"
+        if [[ "$domain" != "use-application-dns.net" && ! "$domain" =~ (updater|telemetry|metrics|brave\.com|mozilla|detectportal) ]]; then
+            printf "%(%Y-%m-%d %H:%M:%S)T|BLOCKED_WEBSITE|%s\n" -1 "$domain" >> "$log_file"
+        fi
     fi
 done &
 dns_tail_pid=$!
